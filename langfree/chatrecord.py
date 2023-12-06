@@ -31,17 +31,17 @@ def get_child_chat_run(run):
     client = Client()
     if run.execution_order != 1: # this is a child run, get the parent
         run = client.read_run(run.parent_run_id)
-            
-    _cruns = client.read_run(run_id=run.id, load_child_runs=True).child_runs
-    crun = None
-    
-    if _cruns:
-        chatoai_runs = [c for c in _cruns if c.name == 'ChatOpenAI']
-        if chatoai_runs: 
-            return run, chatoai_runs[-1]
-        else: raise NoChatOpenAI(f'Not able to find ChatOpenAI child run from root run {run.id}')
-    else: 
-        return run, crun
+
+    if not (
+        _cruns := client.read_run(
+            run_id=run.id, load_child_runs=True
+        ).child_runs
+    ):
+        return run, None
+    if chatoai_runs := [c for c in _cruns if c.name == 'ChatOpenAI']:
+        return run, chatoai_runs[-1]
+    else:
+        raise NoChatOpenAI(f'Not able to find ChatOpenAI child run from root run {run.id}')
 
 # %% ../nbs/03_chatrecord.ipynb 6
 class ChatRecord(BaseModel):
@@ -152,8 +152,7 @@ class ChatRecordSet(BaseModel):
             return dest_path
         
     def __iter__(self): 
-        for r in self.records: 
-            yield r
+        yield from self.records
     
     @classmethod
     def load(cls, path:str):

@@ -15,14 +15,13 @@ import asyncio
 def _get_role(m):
     role = m['role'].upper()
     if 'function_call' in m: return f"{role} - Function Call"
-    if role == 'FUNCTION': return 'FUNCTION RESULTS'
-    else: return role
+    return 'FUNCTION RESULTS' if role == 'FUNCTION' else role
 
 def _get_content(m):
-    if 'function_call' in m:
-        func = m['function_call']
-        return f"{func['name']}({func['arguments']})"
-    else: return m['content']
+    if 'function_call' not in m:
+        return m['content']
+    func = m['function_call']
+    return f"{func['name']}({func['arguments']})"
 
 def render_input_chat(run:RunData, markdown=True):
     "Render the chat history, except for the last output as a group of cards."
