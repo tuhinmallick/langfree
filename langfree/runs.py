@@ -41,9 +41,10 @@ def _temp_env_var(vars_dict):
 
 # %% ../nbs/01_runs.ipynb 4
 def check_api_key(nm="LANGCHAIN_HUB_API_KEY"):
-    val = os.getenv(nm)
-    if not val: raise Exception(f"You must set the environment variable {nm}")
-    return val
+    if val := os.getenv(nm):
+        return val
+    else:
+        raise Exception(f"You must set the environment variable {nm}")
 
 # %% ../nbs/01_runs.ipynb 5
 check_api_key("LANGCHAIN_API_KEY")
@@ -106,18 +107,18 @@ def get_recent_runs(start_dt=None, end_dt=None, last_n_days=2, limit=None):
         start_dt_obj = latest_run_dt - timedelta(days=last_n_days)
     else:
         start_dt_obj = datetime.strptime(start_dt, '%m/%d/%Y')
-        
+
     if end_dt is None:
         if start_dt is None:
             end_dt_obj = start_dt_obj + timedelta(days=last_n_days+1) # their logic is off lte is really lt
         else:
             end_dt_obj = datetime.strptime(start_dt, '%m/%d/%Y') + timedelta(days=last_n_days+1) # their logic is off lte is really lt   
+    elif start_dt is None:
+        raise ValueError("end_dt should only be provided if start_dt is provided.")
     else:
-        if start_dt is None:
-            raise ValueError("end_dt should only be provided if start_dt is provided.")
         end_dt_obj = datetime.strptime(end_dt, '%m/%d/%Y')
-    
-    
+
+
     runs = get_runs_by_commit(start_dt=start_dt_obj.strftime('%m/%d/%Y'),
                     end_dt=end_dt_obj.strftime('%m/%d/%Y'))
     return list(runs) if limit is None else take(runs, limit)
@@ -126,11 +127,18 @@ def get_recent_runs(start_dt=None, end_dt=None, last_n_days=2, limit=None):
 def get_recent_commit_tags(start_dt=None, end_dt=None, last_n_days=2, return_df=False):
     "Print a table of recent commit SHAs from Langsmith along with their counts that you can filter on"
     runs = L(get_recent_runs(start_dt=start_dt, end_dt=end_dt, last_n_days=last_n_days))
-    data = runs.map(lambda x: {'start_dt': x.start_time.strftime('%m/%d/%Y'),
-                        'commit': first([t.split('commit:')[-1] for t in x.tags if t.startswith('commit:')])
-                       }
-            )
-    if data:
+    if data := runs.map(
+        lambda x: {
+            'start_dt': x.start_time.strftime('%m/%d/%Y'),
+            'commit': first(
+                [
+                    t.split('commit:')[-1]
+                    for t in x.tags
+                    if t.startswith('commit:')
+                ]
+            ),
+        }
+    ):
         df = pd.DataFrame(data)
         agg = df.groupby(['start_dt']).value_counts().reset_index()
         agg = agg.rename(columns={0: 'count'}).sort_values(by=['start_dt', 'count'], ascending=False)
@@ -138,7 +146,7 @@ def get_recent_commit_tags(start_dt=None, end_dt=None, last_n_days=2, return_df=
             print(agg.to_markdown(index=False))
         else:
             return agg
-        
+
     else:
         print(f'No commits found for {start_dt} - {end_dt}')
         return None
@@ -151,24 +159,24 @@ def _ischatopenai(run):
 # %% ../nbs/01_runs.ipynb 27
 def get_params(run:langsmith.schemas.Run) -> dict:
     "Get important parameters from a run logged in LangSmith"
-    if 'invocation_params' in run.extra:
-        p = run.extra['invocation_params']
-        return dict(param_model_name=p.get('model'),
-                    param_n=p.get('n'),
-                    param_top_p=p.get('top_p'),
-                    param_temp=p.get('temperature'),
-                    param_presence_penalty=p.get('presence_penalty'),
-                    param_freq_penalty=p.get('frequency_penalty')
-                   )
-    else: return {}    
+    if 'invocation_params' not in run.extra:
+        return {}
+    p = run.extra['invocation_params']
+    return dict(param_model_name=p.get('model'),
+                param_n=p.get('n'),
+                param_top_p=p.get('top_p'),
+                param_temp=p.get('temperature'),
+                param_presence_penalty=p.get('presence_penalty'),
+                param_freq_penalty=p.get('frequency_penalty')
+               )    
 
 # %% ../nbs/01_runs.ipynb 29
 def get_functions(run:langsmith.schemas.Run) -> List[dict]:
     "Get function definitions from a LangSmith run."
-    if 'invocation_params' in run.extra:
-        p = run.extra['invocation_params']
-        return p.get('functions', [])
-    else: return []
+    if 'invocation_params' not in run.extra:
+        return []
+    p = run.extra['invocation_params']
+    return p.get('functions', [])
 
 # %% ../nbs/01_runs.ipynb 32
 def get_feedback(run:langsmith.schemas.Run) -> list:

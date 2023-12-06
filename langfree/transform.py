@@ -55,11 +55,14 @@ def _gen_name():
     response = chat(
         temperature=1.9,
         max_tokens=4,
-        model="gpt-3.5-turbo", 
+        model="gpt-3.5-turbo",
         messages=[
-         {"role": "system", "content": "You are a helpful assistant."},
-         {"role": "user", "content": f"Imagine a full name for a person. Only return a first and last name."}
-        ]
+            {"role": "system", "content": "You are a helpful assistant."},
+            {
+                "role": "user",
+                "content": "Imagine a full name for a person. Only return a first and last name.",
+            },
+        ],
     )
     return response.choices[0].message.content.strip().replace('.', '')
 
@@ -120,7 +123,7 @@ class RunData(BaseModel):
         "The output of the LLM in markdown."
         return self._flatten_data([self.output])
 
-    @classmethod	
+    @classmethod
     def _flatten_data(cls, data):
         "Produce a flattened view of the data as human readable Markdown."
         md_str = ""
@@ -131,12 +134,11 @@ class RunData(BaseModel):
                 role += ' - function call'
             if role == 'function':
                 role += ' - results'
-            
+
             md_str += f"### {role.title()}\n\n"
 
-            content = item.get('content', '')
-            if content: md_str += content + "\n"
-                
+            if content := item.get('content', ''):
+                if content: md_str += content + "\n"
             elif 'function_call' in item:
                 func_name = item['function_call']['name']
                 args = json.loads(item['function_call']['arguments'])
@@ -148,8 +150,9 @@ class RunData(BaseModel):
 # %% ../nbs/02_transform.ipynb 27
 def _sub_name_in_func(funcs, name):
     "Substitute 'Unit Test' for `name` in the `email-campaign-creator` function"
-    emailfunc = L(funcs).filter(lambda x: x['name'] == 'email-campaign-creator')
-    if emailfunc:
+    if emailfunc := L(funcs).filter(
+        lambda x: x['name'] == 'email-campaign-creator'
+    ):
         func = emailfunc[0]
         desc = func['parameters']['properties']['body']['description']
         new_desc = desc.replace('Unit Test', name)
@@ -206,7 +209,7 @@ def validate_jsonl(fname):
 
     # Initial dataset stats
     print("Num examples:", len(dataset))
-        
+
     # Format error checks
     format_errors = defaultdict(int)
 
@@ -237,7 +240,9 @@ def validate_jsonl(fname):
                 format_errors["missing_content"] += 1
                 print(f'missing_content in row:{i} message {im}')
 
-        if not any(message.get("role", None) == "assistant" for message in messages):
+        if all(
+            message.get("role", None) != "assistant" for message in messages
+        ):
             format_errors["example_missing_assistant_message"] += 1
 
     if format_errors:
